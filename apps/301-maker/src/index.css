@@ -1,0 +1,36 @@
+@import 'primeflex/primeflex.min.css';
+
+* {
+  font-family: Roboto, sans-serif;
+  font-size: 12px;
+}
+
+
+
+body {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+}
+
+ul.p-menubar-root-list > li.p-menuitem li.p-menuitem > a.p-menuitem-link
+{
+  display: flex;
+  flex-grow: 1;
+}
+
+.accel-item-wrapper,
+.accel-item-wrapper > .label-cell,
+.accel-item-wrapper > .label-cell > .p-menuitem-text {
+  white-space: nowrap;
+}
+
+.p-submenu-list {
+  /*display: none !important;*/
+  /*flex-direction: column;*/
+  width: auto;
+}
+
+.p-menuitem-active > .p-submenu-list {
+  /*display: flex !important;*/
+}
