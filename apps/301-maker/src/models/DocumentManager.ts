@@ -1,12 +1,31 @@
 // src/DocumentManager.ts
-import {makeAutoObservable} from 'mobx';
+import {makeAutoObservable, runInAction} from 'mobx';
 import {CommandBus} from '../framework/command/CommandBus.ts';
-import {AppDocument} from './AppDocument';
+import type {AppDocument} from './AppDocument';
 import {DocumentRepository} from '../repository/DocumentRepository';
 import {EnablementPredicates} from "../framework/command/CommandEnabler.ts";
 import {commands} from "../resources/commands.ts";
+import {handler} from "../utils/handler";
+
+const openOptions = {
+    title: "Open Document",
+    filters: [
+        { name: 'Text Files', extensions: ['txt'] },
+        { name: 'All Files', extensions: ['*'] }
+    ]
+}
+
+const saveOptions = {
+    title: "Save Document",
+    filters: [
+        { name: 'Text Files', extensions: ['txt'] },
+        { name: 'All Files', extensions: ['*'] }
+    ],
+    defaultName: "untitled.txt"
+}
 
 export class DocumentManager {
+
     document?: AppDocument;
     file?: string;
     modified : boolean = false;
@@ -23,12 +42,32 @@ export class DocumentManager {
         this.registerCommandHandlers();
     }
 
+    setDocument(document?: AppDocument) {
+        runInAction(() => {
+            this.document = document;
+        })
+    }
+
+    setFile(file?: string) {
+        runInAction(() => {
+            this.file = file;
+        })
+    }
+
+    setModified(modified: boolean) {
+        runInAction(() => {this.modified = modified;});
+    }
+
+    setBusy(busy: boolean) {
+        runInAction(()=>{this.busy = busy;});
+    }
+
     private registerCommandHandlers() {
-        this.commandBus.addEventListener('FILE_NEW', this.handleNewCommand.bind(this));
-        this.commandBus.addEventListener('FILE_OPEN', this.handleOpenCommand.bind(this));
-        this.commandBus.addEventListener('FILE_SAVE', this.handleSaveCommand.bind(this));
-        this.commandBus.addEventListener('FILE_SAVE_AS', this.handleSaveAsCommand.bind(this));
-        this.commandBus.addEventListener('FILE_CLOSE', this.handleCloseCommand.bind(this));
+        this.commandBus.addEventListener('FILE_NEW', handler(this.handleNewCommand.bind(this)));
+        this.commandBus.addEventListener('FILE_OPEN', handler(this.handleOpenCommand.bind(this)));
+        this.commandBus.addEventListener('FILE_SAVE', handler(this.handleSaveCommand.bind(this)));
+        this.commandBus.addEventListener('FILE_SAVE_AS', handler(this.handleSaveAsCommand.bind(this)));
+        this.commandBus.addEventListener('FILE_CLOSE', handler(this.handleCloseCommand.bind(this)));
     }
 
     private async handleNewCommand(_event: Event) {
@@ -36,9 +75,9 @@ export class DocumentManager {
     }
 
     private async handleOpenCommand(_event: Event) {
-        const file = prompt('Enter the name of the file to open:', 'opened-file.txt');
-        if (file) {
-            await this.openDocument(file);
+        const result = await this.repository.askOpenOne(openOptions);
+        if (result) {
+            await this.openDocument(result);
         }
     }
 
@@ -46,7 +85,7 @@ export class DocumentManager {
         if (this.file) {
             await this.saveDocument();
         } else {
-            const file = prompt('Enter the name of the file to save:', 'untitled.txt');
+            const file = await this.repository.askSave(saveOptions);
             if (file) {
                 await this.saveDocumentAs(file);
             }
@@ -54,13 +93,15 @@ export class DocumentManager {
     }
 
     private async handleSaveAsCommand(_event: Event) {
-        const file = prompt('Enter the new file name to save as:', 'saved-as-file.txt');
+        const file = await this.repository.askSave(
+            Object.assign({}, saveOptions, this.file ? {defaultPath: this.file} : {})
+        );
         if (file) {
             await this.saveDocumentAs(file);
         }
     }
 
-    private handleCloseCommand(_event: Event) {
+    private async handleCloseCommand(_event: Event) {
         this.closeDocument();
     }
 
@@ -75,75 +116,72 @@ export class DocumentManager {
 
     // Document operations
     newDocument() {
-        this.document = { content: '' };
-        this.file = undefined;
-        this.modified = false;
+        runInAction(() => {
+            this.document = { content: '' };
+            this.file = undefined;
+            this.modified = false;
+        });
     }
 
     async openDocument(file: string) {
-        this.busy = true;
+        runInAction(() => this.busy = true);
         this.abortController = new AbortController();
         try {
-            this.document = await this.repository.load(file, this.abortController.signal);
-            this.file = file;
-            this.modified = false;
-        } catch (error) {
-            if (error instanceof Error && 'AbortError' !== error.name) {
-                console.error('Failed to open document:', error);
-                alert('Failed to open document.');
-            }
-        } finally {
-            this.busy = false;
+            const document = await this.repository.load(file, this.abortController.signal)
+            runInAction(() => {
+                this.document = document;
+                this.file = file;
+                this.modified = false;
+            });
+        }
+        finally {
+            runInAction(() => this.busy = false);
             this.abortController = undefined;
         }
     }
 
     closeDocument() {
-        this.document = undefined;
-        this.file = undefined;
-        this.modified = false;
+        runInAction(() => {
+            this.document = undefined;
+            this.file = undefined;
+            this.modified = false;
+        });
     }
 
     modifyDocument(newContent: string) {
-        if (this.document) {
-            this.document.content = newContent;
-            this.modified = true;
-        }
+        runInAction(() => {
+            if (this.document) {
+                this.document.content = newContent;
+                this.modified = true;
+            }
+        });
     }
 
     async saveDocumentAs(newFile: string) {
         if (this.document) {
             const originalFile = this.file; // Store the original filename
-            this.file = newFile; // Assign the new filename temporarily
-
+            this.setFile(newFile);
             try {
                 await this.saveDocument(); // Attempt to save with the new filename
-            } catch (error) {
+            } catch (err) {
                 // Rollback the filename assignment upon failure
-                this.file = originalFile;
-
+                this.setFile(originalFile);
                 // Re-throw the error to be handled elsewhere if needed
-                throw error;
+                throw err;
             }
         }
     }
 
     async saveDocument() {
         if (this.document && this.file) {
-            this.busy = true;
+            this.setBusy(true);
             this.abortController = new AbortController();
             try {
                 await this.repository.save(this.document, this.file, this.abortController.signal);
-                this.modified = false;
-            } catch (error) {
-                if (error instanceof Error && error.name !== 'AbortError') {
-                    console.error('Failed to save document:', error);
-                    alert('Failed to save document.');
-                }
-                // Re-throw the error to be handled by saveDocumentAs() if needed
-                throw error;
-            } finally {
-                this.busy = false;
+                this.setModified(false);
+            }
+            finally {
+                this.setBusy(false);
                 this.abortController = undefined;
             }
         } else {

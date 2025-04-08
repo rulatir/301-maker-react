@@ -1,8 +1,8 @@
 import { Command } from "../framework/command/Command.ts";
 
-const cmd = (label: string, icon?: string) => ({label, icon, id: ""});
+export const cmd = (label: string, icon?: string) => ({label, icon, id: ""});
 
-const commands: {[k: string]: Command} = {
+export const commands: {[k: string]: Command} = {
     FILE_NEW:       cmd("New", "plus"),
     FILE_OPEN:      cmd("Open", "folder-open"),
     FILE_SAVE:      cmd("Save", "save"),
@@ -12,6 +12,3 @@ const commands: {[k: string]: Command} = {
 }
 
 for(let id in commands) commands[id].id=id;
-
-
-export {cmd, commands};

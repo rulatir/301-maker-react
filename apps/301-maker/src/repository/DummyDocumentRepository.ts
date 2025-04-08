@@ -1,9 +1,31 @@
 // src/DummyDocumentRepository.ts
-import { DocumentRepository } from './DocumentRepository';
+import { DocumentRepository, FileTypeProfile } from './DocumentRepository';
 import { AppDocument } from '../models/AppDocument';
 import { abortablePromise } from '../framework/utility/abortablePromise';
+import DocumentRepositoryBase from "./DocumentRepositoryBase";
 
-export class DummyDocumentRepository implements DocumentRepository {
+
+export class DummyDocumentRepository extends DocumentRepositoryBase implements DocumentRepository {
+    async askOpen(options?: {
+        defaultPath?: string;
+        multiple?: boolean;
+        typeProfiles?: FileTypeProfile[];
+        title?: string;
+    }): Promise<string | string[] | null> {
+        const name = options?.defaultPath || "document.txt";
+        return prompt(options?.title || "Enter the file name to open:", name);
+    }
+
+    async askSave(options?: {
+        defaultPath?: string;
+        defaultName?: string;
+        typeProfiles?: FileTypeProfile[];
+        title?: string;
+    }): Promise<string | null> {
+        const name = options?.defaultName || options?.defaultPath || "document.txt";
+        return prompt(options?.title || "Enter the file name to save:", name);
+    }
+
     async load(file: string, abortSignal?: AbortSignal): Promise<AppDocument> {
         const ioOperation = simulateIO<AppDocument>(() => {
             return { content: `Content loaded from ${file}` };

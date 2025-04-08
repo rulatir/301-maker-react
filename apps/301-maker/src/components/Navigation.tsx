@@ -3,12 +3,12 @@ import React, {ReactNode, useContext} from "react";
 import {MenuItem, MenuItemOptions} from "primereact/menuitem";
 import AccelLabel from "../ui/AccelLabel.tsx";
 import {Accel} from "../ui/Accel.ts";
-import accels from "../resources/accels.ts";
 import ICommandEnabler from "../framework/contracts/ICommandEnabler.ts";
 import {observer} from "mobx-react-lite";
 import {CommandBusContext} from "../framework/command/CommandBusContext.ts";
 import {Main} from "../resources/menus.ts";
 import fixKeys from "../framework/utility/fixKeys.ts";
+import accelerators from "../resources/accelerators.ts";
 
 interface NavigationProps extends MenubarProps {
     enabler: ICommandEnabler;
@@ -24,7 +24,7 @@ const Navigation: React.FC<NavigationProps> = observer((props : NavigationProps)
 });
 
 function retrieveAccel(id: string|undefined): Accel|undefined {
-    return id ? accels[id as keyof typeof accels] : undefined;
+    return id ? accelerators[id as keyof typeof accelerators] : undefined;
 }
 const accelTemplate = (options: MenuItemOptions, accel?: Accel) : ReactNode => {
     const {props, ...rest} = options.element as React.ReactElement;
